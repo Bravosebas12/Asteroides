@@ -3,7 +3,9 @@ import { W, H } from "../constants.js";
 import { rand } from "../utils.js";
 
 export class PowerUp {
-  constructor() {
+  constructor(type = Math.random() < 0.5 ? "tripleShot" : "slowmo") {
+    this.type = type;
+    this.color = type === "tripleShot" ? "#fa0" : "#0ef";
     this.x = rand(60, W - 60);
     this.y = rand(60, H - 60);
     this.radius = 14;
@@ -26,24 +28,29 @@ export class PowerUp {
     ctx.rotate(this.rot);
     ctx.globalAlpha = alpha * pulse;
 
-    // Círculo exterior
     ctx.beginPath();
     ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-    ctx.strokeStyle = "#fa0";
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 1.5;
     ctx.shadowBlur = 10;
-    ctx.shadowColor = "#fa0";
+    ctx.shadowColor = this.color;
     ctx.stroke();
 
-    // 3 puntos en abanico
-    const offsets = [-0.45, 0, 0.45];
-    for (const o of offsets) {
-      const bx = Math.cos(o) * 7;
-      const by = Math.sin(o) * 7;
-      ctx.beginPath();
-      ctx.arc(bx, by, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = "#fa0";
-      ctx.fill();
+    if (this.type === "tripleShot") {
+      const offsets = [-0.45, 0, 0.45];
+      for (const o of offsets) {
+        const bx = Math.cos(o) * 7;
+        const by = Math.sin(o) * 7;
+        ctx.beginPath();
+        ctx.arc(bx, by, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+      }
+    } else {
+      // Slowmo: dos barras verticales (símbolo pausa)
+      ctx.fillStyle = this.color;
+      ctx.fillRect(-5, -6, 3, 12);
+      ctx.fillRect(2, -6, 3, 12);
     }
 
     ctx.restore();

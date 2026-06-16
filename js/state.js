@@ -12,6 +12,7 @@ export const gs = {
   particles: [],
   powerups: [],
   powerupTimer: 15,
+  slowmoTimer: 0,
   score: 0,
   lives: 3,
   level: 1,
@@ -42,6 +43,7 @@ export function initGame() {
   gs.particles = [];
   gs.powerups = [];
   gs.powerupTimer = 15;
+  gs.slowmoTimer = 0;
   gs.score = 0;
   gs.lives = 3;
   gs.level = 1;
@@ -55,6 +57,7 @@ export function nextLevel() {
   gs.particles = [];
   gs.powerups = [];
   gs.powerupTimer = 10;
+  gs.slowmoTimer = 0;
   gs.ship.reset();
   spawnAsteroids(3 + gs.level);
 }

@@ -40,9 +40,12 @@ export function update(dt) {
     gs.powerupTimer = 15;
   }
 
+  if (gs.slowmoTimer > 0) gs.slowmoTimer -= dt;
+
   gs.ship.update(dt);
   gs.bullets.forEach((b) => b.update(dt));
-  gs.asteroids.forEach((a) => a.update(dt));
+  const asteroidDt = gs.slowmoTimer > 0 ? dt * 0.5 : dt;
+  gs.asteroids.forEach((a) => a.update(asteroidDt));
   gs.particles.forEach((p) => p.update(dt));
   gs.powerups.forEach((pu) => pu.update(dt));
 
@@ -54,7 +57,8 @@ export function update(dt) {
   for (const pu of gs.powerups) {
     if (dist(gs.ship, pu) < gs.ship.radius + pu.radius) {
       pu.dead = true;
-      gs.ship.tripleShot = 10;
+      if (pu.type === "tripleShot") gs.ship.tripleShot = 10;
+      if (pu.type === "slowmo") gs.slowmoTimer = 6;
       gs.powerupTimer = 15;
     }
   }
