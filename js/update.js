@@ -1,7 +1,14 @@
 import { pressed } from "./input.js";
 import { dist } from "./utils.js";
 import { POINTS } from "./constants.js";
-import { gs, initGame, nextLevel, explode, killShip } from "./state.js";
+import {
+  gs,
+  initGame,
+  nextLevel,
+  explode,
+  killShip,
+  spawnPowerUp,
+} from "./state.js";
 
 export function update(dt) {
   if (gs.status === "gameover") {
@@ -26,13 +33,31 @@ export function update(dt) {
   if (pressed("Space")) gs.bullets.push(...gs.ship.tryShoot());
   if (pressed("KeyS") && gs.ship.shield === 0) gs.ship.shield = 5;
 
+  // Spawn power-up periódico
+  gs.powerupTimer -= dt;
+  if (gs.powerupTimer <= 0) {
+    spawnPowerUp();
+    gs.powerupTimer = 15;
+  }
+
   gs.ship.update(dt);
   gs.bullets.forEach((b) => b.update(dt));
   gs.asteroids.forEach((a) => a.update(dt));
   gs.particles.forEach((p) => p.update(dt));
+  gs.powerups.forEach((pu) => pu.update(dt));
 
   gs.bullets = gs.bullets.filter((b) => !b.dead);
   gs.particles = gs.particles.filter((p) => !p.dead);
+  gs.powerups = gs.powerups.filter((pu) => !pu.dead);
+
+  // Nave vs power-up
+  for (const pu of gs.powerups) {
+    if (dist(gs.ship, pu) < gs.ship.radius + pu.radius) {
+      pu.dead = true;
+      gs.ship.tripleShot = 10;
+      gs.powerupTimer = 15;
+    }
+  }
 
   // Bala vs asteroide
   const newAsteroids = [];

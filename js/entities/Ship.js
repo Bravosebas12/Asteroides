@@ -20,6 +20,7 @@ export class Ship {
     this.invincible = 3;
     this.shootCooldown = 0;
     this.shield = 0;
+    this.tripleShot = 0;
     this.dead = false;
   }
 
@@ -28,6 +29,7 @@ export class Ship {
     if (this.invincible > 0) this.invincible -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.shield > 0) this.shield -= dt;
+    if (this.tripleShot > 0) this.tripleShot -= dt;
 
     const ROT = 3.5;
     const THRUST = 260;
@@ -54,6 +56,8 @@ export class Ship {
     const NOSE = 21;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
+    if (this.tripleShot > 0)
+      return [-0.25, 0, 0.25].map((o) => new Bullet(ox, oy, this.angle + o));
     return [new Bullet(ox, oy, this.angle)];
   }
 

@@ -49,6 +49,7 @@ export function draw() {
   gs.particles.forEach((p) => p.draw());
   gs.asteroids.forEach((a) => a.draw());
   gs.bullets.forEach((b) => b.draw());
+  gs.powerups.forEach((pu) => pu.draw());
   gs.ship.draw();
 
   drawHUD();

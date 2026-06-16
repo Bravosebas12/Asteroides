@@ -3,18 +3,25 @@ import { W, H } from "./constants.js";
 import { Ship } from "./entities/Ship.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { Particle } from "./entities/Particle.js";
+import { PowerUp } from "./entities/PowerUp.js";
 
 export const gs = {
   ship: null,
   bullets: [],
   asteroids: [],
   particles: [],
+  powerups: [],
+  powerupTimer: 15,
   score: 0,
   lives: 3,
   level: 1,
   status: "playing",
   deadTimer: 0,
 };
+
+export function spawnPowerUp() {
+  if (gs.powerups.length === 0) gs.powerups.push(new PowerUp());
+}
 
 export function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -33,6 +40,8 @@ export function initGame() {
   gs.bullets = [];
   gs.asteroids = [];
   gs.particles = [];
+  gs.powerups = [];
+  gs.powerupTimer = 15;
   gs.score = 0;
   gs.lives = 3;
   gs.level = 1;
@@ -44,6 +53,8 @@ export function nextLevel() {
   gs.level++;
   gs.bullets = [];
   gs.particles = [];
+  gs.powerups = [];
+  gs.powerupTimer = 10;
   gs.ship.reset();
   spawnAsteroids(3 + gs.level);
 }
