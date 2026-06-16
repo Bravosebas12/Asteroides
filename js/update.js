@@ -59,6 +59,13 @@ export function update(dt) {
       pu.dead = true;
       if (pu.type === "tripleShot") gs.ship.tripleShot = 10;
       if (pu.type === "slowmo") gs.slowmoTimer = 6;
+      if (pu.type === "novaBomb") {
+        for (const a of gs.asteroids) {
+          gs.score += POINTS[a.size];
+          explode(a.x, a.y, a.size * 6);
+        }
+        gs.asteroids = [];
+      }
       gs.powerupTimer = 15;
     }
   }

@@ -3,9 +3,17 @@ import { W, H } from "../constants.js";
 import { rand } from "../utils.js";
 
 export class PowerUp {
-  constructor(type = Math.random() < 0.5 ? "tripleShot" : "slowmo") {
+  constructor(
+    type = (() => {
+      const r = Math.random();
+      if (r < 0.2) return "novaBomb";
+      if (r < 0.6) return "tripleShot";
+      return "slowmo";
+    })(),
+  ) {
     this.type = type;
-    this.color = type === "tripleShot" ? "#fa0" : "#0ef";
+    this.color =
+      type === "tripleShot" ? "#fa0" : type === "slowmo" ? "#0ef" : "#f0f";
     this.x = rand(60, W - 60);
     this.y = rand(60, H - 60);
     this.radius = 14;
@@ -46,11 +54,22 @@ export class PowerUp {
         ctx.fillStyle = this.color;
         ctx.fill();
       }
-    } else {
-      // Slowmo: dos barras verticales (símbolo pausa)
+    } else if (this.type === "slowmo") {
+      // Dos barras verticales (símbolo pausa)
       ctx.fillStyle = this.color;
       ctx.fillRect(-5, -6, 3, 12);
       ctx.fillRect(2, -6, 3, 12);
+    } else {
+      // Nova bomb: starburst 8 líneas
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 3, Math.sin(a) * 3);
+        ctx.lineTo(Math.cos(a) * 9, Math.sin(a) * 9);
+        ctx.stroke();
+      }
     }
 
     ctx.restore();
