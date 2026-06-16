@@ -21,6 +21,7 @@ export class Ship {
     this.shootCooldown = 0;
     this.shield = 0;
     this.tripleShot = 0;
+    this.hyperDrive = 0;
     this.dead = false;
   }
 
@@ -30,10 +31,11 @@ export class Ship {
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.shield > 0) this.shield -= dt;
     if (this.tripleShot > 0) this.tripleShot -= dt;
+    if (this.hyperDrive > 0) this.hyperDrive -= dt;
 
     const ROT = 3.5;
-    const THRUST = 260;
-    const DRAG = 0.987;
+    const THRUST = this.hyperDrive > 0 ? 650 : 260;
+    const DRAG = this.hyperDrive > 0 ? 0.993 : 0.987;
 
     if (keys["ArrowLeft"]) this.angle -= ROT * dt;
     if (keys["ArrowRight"]) this.angle += ROT * dt;
@@ -96,11 +98,16 @@ export class Ship {
     ctx.stroke();
 
     if (this.thrusting && Math.random() > 0.35) {
+      const flameLen = this.hyperDrive > 0 ? rand(16, 30) : rand(6, 14);
+      const flameColor =
+        this.hyperDrive > 0
+          ? "rgba(0, 255, 120, 0.9)"
+          : "rgba(255, 130, 0, 0.85)";
       ctx.beginPath();
       ctx.moveTo(-8, -4);
-      ctx.lineTo(-8 - rand(6, 14), 0);
+      ctx.lineTo(-8 - flameLen, 0);
       ctx.lineTo(-8, 4);
-      ctx.strokeStyle = "rgba(255, 130, 0, 0.85)";
+      ctx.strokeStyle = flameColor;
       ctx.stroke();
     }
 

@@ -6,14 +6,21 @@ export class PowerUp {
   constructor(
     type = (() => {
       const r = Math.random();
-      if (r < 0.2) return "novaBomb";
-      if (r < 0.6) return "tripleShot";
+      if (r < 0.15) return "novaBomb";
+      if (r < 0.3) return "hyperDrive";
+      if (r < 0.65) return "tripleShot";
       return "slowmo";
     })(),
   ) {
     this.type = type;
     this.color =
-      type === "tripleShot" ? "#fa0" : type === "slowmo" ? "#0ef" : "#f0f";
+      type === "tripleShot"
+        ? "#fa0"
+        : type === "slowmo"
+          ? "#0ef"
+          : type === "hyperDrive"
+            ? "#0f8"
+            : "#f0f";
     this.x = rand(60, W - 60);
     this.y = rand(60, H - 60);
     this.radius = 14;
@@ -59,6 +66,17 @@ export class PowerUp {
       ctx.fillStyle = this.color;
       ctx.fillRect(-5, -6, 3, 12);
       ctx.fillRect(2, -6, 3, 12);
+    } else if (this.type === "hyperDrive") {
+      // Rayo: flecha hacia la derecha
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-7, 0);
+      ctx.lineTo(5, 0);
+      ctx.moveTo(2, -4);
+      ctx.lineTo(7, 0);
+      ctx.lineTo(2, 4);
+      ctx.stroke();
     } else {
       // Nova bomb: starburst 8 líneas
       ctx.strokeStyle = this.color;
