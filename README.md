@@ -2,6 +2,9 @@
 
 Clon del clásico arcade **Asteroids** implementado en canvas HTML5 puro, sin dependencias ni bundler.
 
+## Intrucciones
+Sint aute sint voluptate dolore ut eiusmod voluptate. Eiusmod aliquip eu cillum culpa. Proident laborum reprehenderit cupidatat voluptate aliqua ullamco aliquip aliquip ipsum adipisicing ullamco aliquip velit ad. Dolor incididunt laborum ipsum proident non Lorem qui. Duis duis irure reprehenderit anim ad elit qui elit exercitation tempor in elit ad do. Minim aliqua velit cupidatat occaecat occaecat minim.
+
 ## Demo:
 
 [Asteroids demo](https://klerith.github.io/claude-asteroids/)
