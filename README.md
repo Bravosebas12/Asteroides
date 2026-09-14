@@ -2,6 +2,11 @@
 
 Clon del clásico arcade **Asteroids** implementado en canvas HTML5 puro, sin dependencias ni bundler.
 
+# Instrucciones
+
+-plan a
+-plan b
+
 ## Demo:
 
 [Asteroids demo](https://klerith.github.io/claude-asteroids/)
