@@ -8,7 +8,7 @@ Clon del clásico arcade **Asteroids** implementado en canvas HTML5 puro, sin de
 
 Sobrevive el mayor número de niveles eliminando todos los asteroides del campo. Cada asteroide destruido suma puntos y, al limpiar el campo, se avanza al siguiente nivel.
 
-## Cómo se juega
+## Cómo se juega ???
 
 1. Usa las flechas para mover la nave: `←`/`→` rotan y `↑` propulsa (con inercia).
 2. Pulsa `Espacio` para disparar; las balas salen del morro de la nave y tienen cadencia propia.
