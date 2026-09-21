@@ -117,16 +117,30 @@ A special "boss" asteroid variant appears randomly (50% chance per level, starti
 - **Size**: Much larger (radius 90 vs regular 50)
 - **Health**: Requires 4 shots to destroy (3 additional shots beyond normal)
 - **Points**: Awards 500 points when destroyed
-- **Visual**: Rendered from `asteroid-boss.png` image file with rotation
+- **Visual**: A neon gear sprite rendered from `asteroid-boss.jpg` with rotation
 - **Behavior**: Moves slowly (speed 25 px/s) and does not split into smaller asteroids
 - **Fallback**: If image fails to load, displays as a golden circle with health number
 
 The boss asteroid health reduces with each bullet hit and is tracked visually (image opacity decreases). When destroyed, it triggers an enhanced explosion effect (30 particles vs 8–20 for regular asteroids).
 
+### Sprite rendering
+
+The source file is a 2816×1536 JPEG with no alpha channel, so `BossAsteroid.draw()` needs
+two things beyond a plain `drawImage`:
+
+- **`BOSS_SPRITE_CROP`** (`{ sx: 1188, sy: 459, sw: 580, sh: 580 }`) — the gear occupies a
+  492×482 region centered at (1478, 749); the rest of the canvas is background and a blue
+  hexagonal frame that must not reach the playfield. The 9-argument `drawImage` overload
+  crops to that square.
+- **`globalCompositeOperation = 'lighter'`** — additive blending over the black playfield
+  makes the JPEG's black pixels contribute nothing, so the sprite no longer paints an
+  opaque rectangle over asteroids and particles behind it, and the neon keeps its glow.
+
 ## Power-Ups
 
-Five power-ups are defined in the `POWERUP_TYPES` catalog in `game.js`. They only appear
-as drops when an asteroid is destroyed — there is no free spawn.
+Five power-ups are defined in the `POWERUP_TYPES` catalog in `game.js`, plus the `LIFE`
+pickup documented under **Extra life** below, which follows its own drop rule. They only
+appear as drops when an asteroid is destroyed — there is no free spawn.
 
 | Power-up | Key | Duration | Effect |
 |---|---|---|---|
@@ -144,6 +158,23 @@ as drops when an asteroid is destroyed — there is no free spawn.
   removes it from the drop pool until `initGame()` runs again.
 - A pickup lives `POWERUP_TTL` (9 s), drifts slowly with wrapping, and blinks in its
   final 3 seconds.
+
+### Extra life
+
+A sixth type, `LIFE` (red 12-sided pickup with a `+` glyph), restores one life. It is
+deliberately **not** in `POWERUP_ORDER`, which keeps it out of both the random drop pool
+(`maybeDropPowerUp`) and the HUD timer column (`drawPowerUpTimers`) — it has no duration.
+
+`maybeDropLife(x, y)` runs next to `maybeDropPowerUp` on every asteroid kill, boss
+included, and drops only when all of these hold:
+
+- the player is down to their last life (`lives === LIFE_DROP_LIVES`, i.e. 1);
+- no other `LIFE` pickup is already on screen;
+- a `LIFE_DROP_CHANCE` (12%) roll succeeds.
+
+It deliberately ignores `POWERUP_MAX` — two ordinary pickups on screen must not block the
+only route back from one life. Collecting it does `lives = Math.min(lives + 1, LIVES_START)`,
+so 3 remains the ceiling. `LIVES_START` is now also the value `initGame()` assigns.
 
 ### Lifecycle
 - `initGame()` resets `powerups`, `effects`, `tripleShotUsed` and `novaFlash`.
@@ -197,7 +228,7 @@ An `EnemyShip` spawns **only on level 5** (`ENEMY_LEVEL`), one per level.
 - All randomness uses `Math.random()`. For determinism/testing, you could inject a PRNG.
 - The game loop is tied to the browser refresh rate and uses delta-time scaling for frame-rate independence.
 - Particles are purely visual and do not affect gameplay (no collision).
-- The `asteroid-boss.png` image is loaded at startup; if missing, the boss renders with fallback styling.
+- The `asteroid-boss.jpg` image is loaded at startup; if missing, the boss renders with fallback styling.
 - The README describes removed features (power-ups, shooting stars); commit history shows what was removed if restoration is needed.
 
 ## Testing & Validation

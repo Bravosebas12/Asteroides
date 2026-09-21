@@ -29,9 +29,15 @@ const dist  = (a, b)   => Math.hypot(a.x - b.x, a.y - b.y);
 const rand  = (min, max) => min + Math.random() * (max - min);
 const randInt = (min, max) => Math.floor(rand(min, max + 1));
 
-// Cargar imagen del asteroid boss
+// Sprite del asteroide especial: engranaje de neón sobre fondo negro (JPEG sin alfa).
 const bossAsteroidImage = new Image();
-bossAsteroidImage.src = 'asteroid-boss.png';
+bossAsteroidImage.src = 'asteroid-boss.jpg';
+
+// Recorte del engranaje dentro del lienzo original (2816x1536). El resto de la imagen
+// es fondo y el marco hexagonal azul, que no deben verse en el juego.
+// Medido sobre el propio archivo: el engranaje ocupa 492x482 px centrado en (1478, 749);
+// el margen extra deja respirar el halo de neón sin llegar al marco hexagonal.
+const BOSS_SPRITE_CROP = { sx: 1188, sy: 459, sw: 580, sh: 580 };
 
 // ── Bullet ────────────────────────────────────────────────────────────────────
 class Bullet {
@@ -160,7 +166,12 @@ class BossAsteroid {
       ctx.translate(this.x, this.y);
       ctx.rotate(this.rot);
       ctx.globalAlpha = this.health / this.maxHealth * 0.8 + 0.2;
-      ctx.drawImage(bossAsteroidImage, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
+      // Composición aditiva: sobre el fondo negro del juego, el negro del JPEG no aporta
+      // nada, así que el sprite no tapa lo que pase por detrás y el neón conserva su brillo.
+      ctx.globalCompositeOperation = 'lighter';
+      const c = BOSS_SPRITE_CROP;
+      ctx.drawImage(bossAsteroidImage, c.sx, c.sy, c.sw, c.sh,
+                    -this.radius, -this.radius, this.radius * 2, this.radius * 2);
       ctx.restore();
     } else {
       // Fallback si la imagen no carga
@@ -401,11 +412,19 @@ const POWERUP_TYPES = {
   SLOW:   { key: 'SLOW',   label: 'SLOW-MO', glyph: 'S', duration: 6,  color: '#9b8cff', sides: 4 },
   NOVA:   { key: 'NOVA',   label: 'NOVA',    glyph: 'N', duration: 0,  color: '#ff5db1', sides: 8 },
   HYPER:  { key: 'HYPER',  label: 'HIPER',   glyph: 'H', duration: 8,  color: '#ffa23d', sides: 5 },
+  // LIFE queda fuera de POWERUP_ORDER a propósito: no entra en el pool de drops
+  // aleatorios (tiene su propia regla) ni en el cronómetro del HUD (no tiene duración).
+  LIFE:   { key: 'LIFE',   label: 'VIDA',    glyph: '+', duration: 0,  color: '#ff4d6d', sides: 12 },
 };
 const POWERUP_ORDER   = ['SHIELD', 'TRIPLE', 'SLOW', 'NOVA', 'HYPER'];
 const POWERUP_TTL     = 9;      // segundos que el ítem permanece en pantalla
 const POWERUP_CHANCE  = 0.18;   // probabilidad de drop al destruir un asteroide
 const POWERUP_MAX     = 2;      // ítems simultáneos en pantalla
+
+// Recuperación de vida: solo se ofrece cuando al jugador le queda la última vida.
+const LIVES_START      = 3;     // vidas iniciales, y también el tope
+const LIFE_DROP_LIVES  = 1;     // vidas restantes que habilitan el drop
+const LIFE_DROP_CHANCE = 0.12;  // probabilidad por asteroide destruido
 
 function polygonPath(sides, radius) {
   ctx.beginPath();
@@ -511,7 +530,7 @@ function initGame() {
   tripleShotUsed = false;
   novaFlash      = 0;
   score  = 0;
-  lives  = 3;
+  lives  = LIVES_START;
   level  = 1;
   state  = 'playing';
   setPaused(false);
@@ -541,6 +560,16 @@ function maybeDropPowerUp(x, y, chance) {
   powerups.push(new PowerUp(x, y, type));
 }
 
+// Suelta un ítem de vida solo con la última vida en juego y nunca más de uno a la vez.
+// No cuenta contra POWERUP_MAX: tener dos power-ups en pantalla no debe bloquear la
+// única vía de recuperación justo en el momento en que hace falta.
+function maybeDropLife(x, y) {
+  if (lives !== LIFE_DROP_LIVES || lives >= LIVES_START) return;
+  if (powerups.some(p => p.type.key === 'LIFE')) return;
+  if (Math.random() >= LIFE_DROP_CHANCE) return;
+  powerups.push(new PowerUp(x, y, POWERUP_TYPES.LIFE));
+}
+
 function detonateNova() {
   for (const a of asteroids) {
     if (a.dead) continue;
@@ -558,6 +587,7 @@ function detonateNova() {
 }
 
 function activatePowerUp(type) {
+  if (type.key === 'LIFE') { lives = Math.min(lives + 1, LIVES_START); return; }
   if (type.key === 'NOVA') { detonateNova(); return; }
   if (type.key === 'TRIPLE') tripleShotUsed = true;
   effects[type.key] = type.duration;   // recogerlo de nuevo refresca la duración
@@ -686,6 +716,7 @@ function update(dt) {
             score += BOSS_POINTS;
             explode(a.x, a.y, 30);
             maybeDropPowerUp(a.x, a.y, 1);   // el boss siempre suelta un power-up
+            maybeDropLife(a.x, a.y);
           }
         } else {
           // Asteroide regular
@@ -694,6 +725,7 @@ function update(dt) {
           explode(a.x, a.y, a.size * 5);
           newAsteroids.push(...a.split());
           maybeDropPowerUp(a.x, a.y, POWERUP_CHANCE);
+          maybeDropLife(a.x, a.y);
         }
       }
     }
