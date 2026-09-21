@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Preferences
+
+- **Language**: Responde en español. All responses to the user should be in Spanish.
+- All code artifacts, comments, and technical documentation default to English unless explicitly requested otherwise.
+
 ## Project Overview
 
 **Asteroids** is a faithful clone of the classic arcade Asteroids game built with vanilla HTML5 Canvas, requiring no build tools, bundler, or external dependencies. The entire game logic is contained in a single 423-line `game.js` file (ES6+).
