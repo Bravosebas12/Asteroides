@@ -161,6 +161,36 @@ as drops when an asteroid is destroyed — there is no free spawn.
   with one decimal (`ESCUDO  3.4s`). Rows blink under 1.5 s. A dim `TRIPLE USADO` label
   appears in the bottom-right once the triple shot has been consumed.
 
+## Pause
+
+The game can be paused with the `P` key or the **PAUSA** button rendered below the canvas
+in `index.html`.
+
+- A global `paused` boolean is kept **separate** from the `state` machine
+  (`'playing' | 'dead' | 'gameover'`), so no existing branch in `update()`/`draw()` changes.
+- `loop()` reads `pressed('KeyP')` and skips `update(dt)` while paused, but still calls
+  `draw()`. `lastTime` keeps advancing every frame, so resuming never produces a `dt` jump.
+- `togglePause()` is a no-op on `gameover`. `setPaused()` also syncs the button label.
+- The overlay reuses `drawOverlay()` on top of a `rgba(0,0,0,0.55)` veil.
+- Buttons call `blur()` after a click; otherwise Space would re-trigger the focused button
+  instead of shooting.
+
+## Enemy Ship
+
+An `EnemyShip` spawns **only on level 5** (`ENEMY_LEVEL`), one per level.
+
+- Same silhouette as the player, drawn through the shared `shipSilhouettePath()` helper,
+  stroked in red (`#ff5a5a`). No thruster flame.
+- Turns toward the player at `ENEMY_ROT` (1.8 rad/s) using `angleDiff()` (shortest arc) and
+  `wrappedDelta()` (shortest distance across the toroidal field), thrusts only when roughly
+  aimed, and fires every `ENEMY_FIRE_INTERVAL` (1.4 s).
+- `Bullet` now takes an `owner` (`'player'` by default, or `'enemy'`), which drives its
+  color and speed. Enemy bullets do **not** break asteroids.
+- Worth `ENEMY_POINTS` (300). Collisions: player bullet destroys it; its bullets and a
+  direct ram hit the ship through `shipTakesHit()` (shield absorbs, otherwise `killShip()`).
+- Level completion is `asteroids.length === 0 && !enemy` — the enemy must be downed too.
+- `killShip()` leaves the enemy alive; `nextLevel()` replaces it.
+
 ## Notes for Future Work
 
 - The canvas size is hardcoded as 800×600 (`W` and `H` constants) — both the canvas HTML element and the physics use these values.
@@ -178,3 +208,6 @@ To manually test after changes:
 3. Verify collision detection (especially ship near asteroid edges)
 4. Confirm score increments correctly for each size
 5. Validate invincibility flicker and respawn behavior
+- The level-skip button (`#btn-skip`, `DEBUG_CONTROLS` block at the bottom of `game.js`)
+  is a temporary testing aid. Remove the whole marked block plus the `<span id="debug-controls">`
+  and its CSS rule before release.
