@@ -117,16 +117,30 @@ A special "boss" asteroid variant appears randomly (50% chance per level, starti
 - **Size**: Much larger (radius 90 vs regular 50)
 - **Health**: Requires 4 shots to destroy (3 additional shots beyond normal)
 - **Points**: Awards 500 points when destroyed
-- **Visual**: Rendered from `asteroid-boss.png` image file with rotation
+- **Visual**: A neon gear sprite rendered from `asteroid-boss.jpg` with rotation
 - **Behavior**: Moves slowly (speed 25 px/s) and does not split into smaller asteroids
 - **Fallback**: If image fails to load, displays as a golden circle with health number
 
 The boss asteroid health reduces with each bullet hit and is tracked visually (image opacity decreases). When destroyed, it triggers an enhanced explosion effect (30 particles vs 8–20 for regular asteroids).
 
+### Sprite rendering
+
+The source file is a 2816×1536 JPEG with no alpha channel, so `BossAsteroid.draw()` needs
+two things beyond a plain `drawImage`:
+
+- **`BOSS_SPRITE_CROP`** (`{ sx: 1188, sy: 459, sw: 580, sh: 580 }`) — the gear occupies a
+  492×482 region centered at (1478, 749); the rest of the canvas is background and a blue
+  hexagonal frame that must not reach the playfield. The 9-argument `drawImage` overload
+  crops to that square.
+- **`globalCompositeOperation = 'lighter'`** — additive blending over the black playfield
+  makes the JPEG's black pixels contribute nothing, so the sprite no longer paints an
+  opaque rectangle over asteroids and particles behind it, and the neon keeps its glow.
+
 ## Power-Ups
 
-Five power-ups are defined in the `POWERUP_TYPES` catalog in `game.js`. They only appear
-as drops when an asteroid is destroyed — there is no free spawn.
+Five power-ups are defined in the `POWERUP_TYPES` catalog in `game.js`, plus the `LIFE`
+pickup documented under **Extra life** below, which follows its own drop rule. They only
+appear as drops when an asteroid is destroyed — there is no free spawn.
 
 | Power-up | Key | Duration | Effect |
 |---|---|---|---|
@@ -145,6 +159,23 @@ as drops when an asteroid is destroyed — there is no free spawn.
 - A pickup lives `POWERUP_TTL` (9 s), drifts slowly with wrapping, and blinks in its
   final 3 seconds.
 
+### Extra life
+
+A sixth type, `LIFE` (red 12-sided pickup with a `+` glyph), restores one life. It is
+deliberately **not** in `POWERUP_ORDER`, which keeps it out of both the random drop pool
+(`maybeDropPowerUp`) and the HUD timer column (`drawPowerUpTimers`) — it has no duration.
+
+`maybeDropLife(x, y)` runs next to `maybeDropPowerUp` on every asteroid kill, boss
+included, and drops only when all of these hold:
+
+- the player is down to their last life (`lives === LIFE_DROP_LIVES`, i.e. 1);
+- no other `LIFE` pickup is already on screen;
+- a `LIFE_DROP_CHANCE` (12%) roll succeeds.
+
+It deliberately ignores `POWERUP_MAX` — two ordinary pickups on screen must not block the
+only route back from one life. Collecting it does `lives = Math.min(lives + 1, LIVES_START)`,
+so 3 remains the ceiling. `LIVES_START` is now also the value `initGame()` assigns.
+
 ### Lifecycle
 - `initGame()` resets `powerups`, `effects`, `tripleShotUsed` and `novaFlash`.
 - `nextLevel()` clears on-screen pickups but **keeps active effects running**.
@@ -161,13 +192,43 @@ as drops when an asteroid is destroyed — there is no free spawn.
   with one decimal (`ESCUDO  3.4s`). Rows blink under 1.5 s. A dim `TRIPLE USADO` label
   appears in the bottom-right once the triple shot has been consumed.
 
+## Pause
+
+The game can be paused with the `P` key or the **PAUSA** button rendered below the canvas
+in `index.html`.
+
+- A global `paused` boolean is kept **separate** from the `state` machine
+  (`'playing' | 'dead' | 'gameover'`), so no existing branch in `update()`/`draw()` changes.
+- `loop()` reads `pressed('KeyP')` and skips `update(dt)` while paused, but still calls
+  `draw()`. `lastTime` keeps advancing every frame, so resuming never produces a `dt` jump.
+- `togglePause()` is a no-op on `gameover`. `setPaused()` also syncs the button label.
+- The overlay reuses `drawOverlay()` on top of a `rgba(0,0,0,0.55)` veil.
+- Buttons call `blur()` after a click; otherwise Space would re-trigger the focused button
+  instead of shooting.
+
+## Enemy Ship
+
+An `EnemyShip` spawns **only on level 5** (`ENEMY_LEVEL`), one per level.
+
+- Same silhouette as the player, drawn through the shared `shipSilhouettePath()` helper,
+  stroked in red (`#ff5a5a`). No thruster flame.
+- Turns toward the player at `ENEMY_ROT` (1.8 rad/s) using `angleDiff()` (shortest arc) and
+  `wrappedDelta()` (shortest distance across the toroidal field), thrusts only when roughly
+  aimed, and fires every `ENEMY_FIRE_INTERVAL` (1.4 s).
+- `Bullet` now takes an `owner` (`'player'` by default, or `'enemy'`), which drives its
+  color and speed. Enemy bullets do **not** break asteroids.
+- Worth `ENEMY_POINTS` (300). Collisions: player bullet destroys it; its bullets and a
+  direct ram hit the ship through `shipTakesHit()` (shield absorbs, otherwise `killShip()`).
+- Level completion is `asteroids.length === 0 && !enemy` — the enemy must be downed too.
+- `killShip()` leaves the enemy alive; `nextLevel()` replaces it.
+
 ## Notes for Future Work
 
 - The canvas size is hardcoded as 800×600 (`W` and `H` constants) — both the canvas HTML element and the physics use these values.
 - All randomness uses `Math.random()`. For determinism/testing, you could inject a PRNG.
 - The game loop is tied to the browser refresh rate and uses delta-time scaling for frame-rate independence.
 - Particles are purely visual and do not affect gameplay (no collision).
-- The `asteroid-boss.png` image is loaded at startup; if missing, the boss renders with fallback styling.
+- The `asteroid-boss.jpg` image is loaded at startup; if missing, the boss renders with fallback styling.
 - The README describes removed features (power-ups, shooting stars); commit history shows what was removed if restoration is needed.
 
 ## Testing & Validation
@@ -178,3 +239,6 @@ To manually test after changes:
 3. Verify collision detection (especially ship near asteroid edges)
 4. Confirm score increments correctly for each size
 5. Validate invincibility flicker and respawn behavior
+- The level-skip button (`#btn-skip`, `DEBUG_CONTROLS` block at the bottom of `game.js`)
+  is a temporary testing aid. Remove the whole marked block plus the `<span id="debug-controls">`
+  and its CSS rule before release.
