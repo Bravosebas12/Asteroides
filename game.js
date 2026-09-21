@@ -29,6 +29,10 @@ const dist  = (a, b)   => Math.hypot(a.x - b.x, a.y - b.y);
 const rand  = (min, max) => min + Math.random() * (max - min);
 const randInt = (min, max) => Math.floor(rand(min, max + 1));
 
+// Cargar imagen del asteroid boss
+const bossAsteroidImage = new Image();
+bossAsteroidImage.src = 'asteroid-boss.png';
+
 // ── Bullet ────────────────────────────────────────────────────────────────────
 class Bullet {
   constructor(x, y, angle) {
@@ -58,9 +62,10 @@ class Bullet {
 }
 
 // ── Asteroid ──────────────────────────────────────────────────────────────────
-const RADII  = [0, 16, 30, 50];   // por tamaño 1, 2, 3
-const SPEEDS = [0, 85, 55, 32];   // velocidad base por tamaño
-const POINTS = [0, 100, 50, 20];  // puntos por tamaño
+const RADII  = [0, 16, 30, 50];     // por tamaño 1, 2, 3
+const SPEEDS = [0, 85, 55, 32];     // velocidad base por tamaño
+const POINTS = [0, 100, 50, 20];    // puntos por tamaño
+const BOSS_POINTS = 500;            // puntos por destruir el boss
 
 class Asteroid {
   constructor(x, y, size = 3) {
@@ -115,6 +120,63 @@ class Asteroid {
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
+  }
+}
+
+// ── Boss Asteroid ─────────────────────────────────────────────────────────────
+class BossAsteroid {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 90;
+    this.health = 4;        // Requiere 4 disparos (3 adicionales)
+    this.maxHealth = 4;
+    this.dead = false;
+
+    const angle = rand(0, Math.PI * 2);
+    const speed = 25;       // Más lento que asteroides regulares
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.rotSpeed = rand(-0.3, 0.3);
+    this.rot = rand(0, Math.PI * 2);
+  }
+
+  update(dt) {
+    this.x = wrap(this.x + this.vx * dt, W);
+    this.y = wrap(this.y + this.vy * dt, H);
+    this.rot += this.rotSpeed * dt;
+  }
+
+  takeDamage() {
+    this.health--;
+    if (this.health <= 0) this.dead = true;
+  }
+
+  draw() {
+    if (bossAsteroidImage.complete && bossAsteroidImage.naturalHeight !== 0) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rot);
+      ctx.globalAlpha = this.health / this.maxHealth * 0.8 + 0.2;
+      ctx.drawImage(bossAsteroidImage, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
+      ctx.restore();
+    } else {
+      // Fallback si la imagen no carga
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rot);
+      ctx.strokeStyle = '#ffcc00';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#ffaa00';
+      ctx.font = 'bold 20px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(this.health, 0, 0);
+      ctx.restore();
+    }
   }
 }
 
@@ -251,6 +313,15 @@ function spawnAsteroids(count) {
     } while (Math.hypot(x - W / 2, y - H / 2) < SAFE_DIST);
     asteroids.push(new Asteroid(x, y, 3));
   }
+  // Boss asteroid aparece con 50% de probabilidad en cada nivel
+  if (Math.random() < 0.5) {
+    let x, y;
+    do {
+      x = rand(0, W);
+      y = rand(0, H);
+    } while (Math.hypot(x - W / 2, y - H / 2) < SAFE_DIST);
+    asteroids.push(new BossAsteroid(x, y));
+  }
 }
 
 function initGame() {
@@ -326,10 +397,22 @@ function update(dt) {
     for (const a of asteroids) {
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
-        a.dead = true;
-        score += POINTS[a.size];
-        explode(a.x, a.y, a.size * 5);
-        newAsteroids.push(...a.split());
+
+        // Manejar boss asteroid con salud
+        if (a instanceof BossAsteroid) {
+          a.takeDamage();
+          explode(a.x, a.y, 10);
+          if (a.dead) {
+            score += BOSS_POINTS;
+            explode(a.x, a.y, 30);
+          }
+        } else {
+          // Asteroide regular
+          a.dead = true;
+          score += POINTS[a.size];
+          explode(a.x, a.y, a.size * 5);
+          newAsteroids.push(...a.split());
+        }
       }
     }
   }
@@ -339,7 +422,8 @@ function update(dt) {
   // Nave vs asteroide
   if (ship.invincible <= 0) {
     for (const a of asteroids) {
-      if (dist(ship, a) < ship.radius + a.radius * 0.82) {
+      const radiusFactor = (a instanceof BossAsteroid) ? 1.0 : 0.82;
+      if (dist(ship, a) < ship.radius + a.radius * radiusFactor) {
         killShip();
         break;
       }
