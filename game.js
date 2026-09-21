@@ -41,10 +41,12 @@ const BOSS_SPRITE_CROP = { sx: 1188, sy: 459, sw: 580, sh: 580 };
 
 // ── Bullet ────────────────────────────────────────────────────────────────────
 class Bullet {
-  constructor(x, y, angle, owner = 'player') {
+  // speed queda en null salvo que quien dispara imponga el suyo (la nave enemiga
+  // escala la velocidad de sus balas con el nivel).
+  constructor(x, y, angle, owner = 'player', speed = null) {
     this.x = x;
     this.y = y;
-    const SPEED = owner === 'enemy' ? 380 : 520;
+    const SPEED = speed !== null ? speed : (owner === 'enemy' ? 380 : 520);
     this.vx = Math.cos(angle) * SPEED;
     this.vy = Math.sin(angle) * SPEED;
     this.ttl  = 1.1;
@@ -290,12 +292,35 @@ class Ship {
 }
 
 // ── Nave enemiga ──────────────────────────────────────────────────────────────
-const ENEMY_LEVEL  = 5;      // nivel en el que aparece la nave enemiga
+const ENEMY_FIRST_LEVEL   = 5;    // primer nivel con nave enemiga; desde aquí, todos
+const ENEMY_PEAK_LEVEL    = 20;   // nivel en el que la dificultad llega al máximo
+const ENEMY_MAX_COUNT     = 2;    // naves por nivel a partir de ENEMY_PEAK_LEVEL
+const ENEMY_RESPAWN_DELAY = 2;    // segundos de respiro antes de que entre la siguiente
 const ENEMY_POINTS = 300;
-const ENEMY_ROT    = 1.8;    // rad/s: giro máximo hacia el jugador
-const ENEMY_THRUST = 120;    // px/s²
 const ENEMY_DRAG   = 0.99;
-const ENEMY_FIRE_INTERVAL = 1.4;   // segundos entre disparos
+
+// Rangos [nivel 5, nivel 20+]. El primer encuentro entra bastante por debajo de la
+// antigua configuración fija (rot 1.8, empuje 120, disparo 1.4 s, bala 380) y sube
+// desde ahí, de modo que el nivel 5 deja de ser el pico de dificultad.
+const ENEMY_ROT_RANGE    = [1.15, 2.20];   // rad/s: giro máximo hacia el jugador
+const ENEMY_THRUST_RANGE = [85,   165];    // px/s²
+const ENEMY_FIRE_RANGE   = [2.40, 1.00];   // segundos entre disparos (menos = peor)
+const ENEMY_BULLET_RANGE = [300,  430];    // px/s
+
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// 0 en el primer nivel con enemigo, 1 desde ENEMY_PEAK_LEVEL en adelante.
+function enemyDifficulty(level) {
+  const span = ENEMY_PEAK_LEVEL - ENEMY_FIRST_LEVEL;
+  return Math.max(0, Math.min(1, (level - ENEMY_FIRST_LEVEL) / span));
+}
+
+// Cuántas naves enemigas toca derribar en este nivel. Nunca coinciden en pantalla:
+// la siguiente entra solo cuando cae la anterior.
+function enemiesForLevel(level) {
+  if (level < ENEMY_FIRST_LEVEL) return 0;
+  return level >= ENEMY_PEAK_LEVEL ? ENEMY_MAX_COUNT : 1;
+}
 
 // Distancia con signo más corta en un eje toroidal (el campo envuelve por los bordes).
 function wrappedDelta(from, to, max) {
@@ -314,18 +339,27 @@ function angleDiff(from, to) {
 }
 
 class EnemyShip {
-  constructor() {
+  // La dificultad se congela al nacer: cada nave conserva los valores del nivel que
+  // la generó, así que no cambia de comportamiento a mitad de combate.
+  constructor(level) {
     const SAFE_DIST = 220;
     do {
       this.x = rand(0, W);
       this.y = rand(0, H);
     } while (Math.hypot(this.x - W / 2, this.y - H / 2) < SAFE_DIST);
 
+    const t = enemyDifficulty(level);
+    this.rot          = lerp(ENEMY_ROT_RANGE[0],    ENEMY_ROT_RANGE[1],    t);
+    this.thrust       = lerp(ENEMY_THRUST_RANGE[0], ENEMY_THRUST_RANGE[1], t);
+    this.fireInterval = lerp(ENEMY_FIRE_RANGE[0],   ENEMY_FIRE_RANGE[1],   t);
+    this.bulletSpeed  = lerp(ENEMY_BULLET_RANGE[0], ENEMY_BULLET_RANGE[1], t);
+
     this.angle  = rand(0, Math.PI * 2);
     this.vx     = 0;
     this.vy     = 0;
     this.radius = 12;
-    this.shootCooldown = ENEMY_FIRE_INTERVAL;
+    // El primer disparo tarda algo más: da margen para reaccionar a su entrada.
+    this.shootCooldown = this.fireInterval * 1.5;
     this.dead   = false;
   }
 
@@ -337,13 +371,13 @@ class EnemyShip {
 
     // Giro limitado hacia el jugador
     const diff = angleDiff(this.angle, aimAngle);
-    const step = ENEMY_ROT * dt;
+    const step = this.rot * dt;
     this.angle += Math.abs(diff) < step ? diff : Math.sign(diff) * step;
 
     // Empuje solo cuando ya apunta razonablemente hacia el objetivo
     if (Math.abs(diff) < 0.6) {
-      this.vx += Math.cos(this.angle) * ENEMY_THRUST * dt;
-      this.vy += Math.sin(this.angle) * ENEMY_THRUST * dt;
+      this.vx += Math.cos(this.angle) * this.thrust * dt;
+      this.vy += Math.sin(this.angle) * this.thrust * dt;
     }
     this.vx *= ENEMY_DRAG;
     this.vy *= ENEMY_DRAG;
@@ -353,10 +387,10 @@ class EnemyShip {
     this.shootCooldown -= dt;
     if (this.shootCooldown > 0 || target.dead) return null;
 
-    this.shootCooldown = ENEMY_FIRE_INTERVAL;
+    this.shootCooldown = this.fireInterval;
     const ox = this.x + Math.cos(aimAngle) * SHIP_NOSE;
     const oy = this.y + Math.sin(aimAngle) * SHIP_NOSE;
-    return new Bullet(ox, oy, aimAngle, 'enemy');
+    return new Bullet(ox, oy, aimAngle, 'enemy', this.bulletSpeed);
   }
 
   draw() {
@@ -489,7 +523,9 @@ class PowerUp {
 
 // ── Estado del juego ──────────────────────────────────────────────────────────
 let ship, bullets, asteroids, particles, powerups;
-let enemy;            // EnemyShip activa, o null
+let enemy;              // EnemyShip en pantalla, o null (nunca hay más de una)
+let enemiesPending;     // naves que aún faltan por entrar en este nivel
+let enemyRespawnTimer;  // cuenta atrás hasta que entra la siguiente
 let effects;          // { SHIELD: segundos restantes, ... }
 let tripleShotUsed;   // TRIPLE solo puede aparecer una vez por partida
 let novaFlash;        // temporizador del destello de la Bomba Nova
@@ -525,7 +561,7 @@ function initGame() {
   asteroids = [];
   particles = [];
   powerups  = [];
-  enemy     = null;
+  resetEnemyWave(0);
   effects        = {};
   tripleShotUsed = false;
   novaFlash      = 0;
@@ -542,9 +578,23 @@ function nextLevel() {
   bullets   = [];
   particles = [];
   powerups  = [];   // los efectos activos se mantienen entre niveles
-  enemy     = level === ENEMY_LEVEL ? new EnemyShip() : null;
+  resetEnemyWave(enemiesForLevel(level));
+  spawnNextEnemy();                       // la primera entra junto con el nivel
   ship.reset();
   spawnAsteroids(3 + level);
+}
+
+// ── Oleada de naves enemigas ──────────────────────────────────────────────────
+function resetEnemyWave(count) {
+  enemy             = null;
+  enemiesPending    = count;
+  enemyRespawnTimer = 0;
+}
+
+function spawnNextEnemy() {
+  if (enemy || enemiesPending <= 0) return;
+  enemiesPending--;
+  enemy = new EnemyShip(level);
 }
 
 function explode(x, y, count = 8) {
@@ -606,6 +656,8 @@ function killEnemy() {
   explode(enemy.x, enemy.y, 20);
   score += ENEMY_POINTS;
   enemy = null;
+  // Si quedan naves por entrar, el jugador tiene unos segundos de respiro.
+  if (enemiesPending > 0) enemyRespawnTimer = ENEMY_RESPAWN_DELAY;
 }
 
 // Impacto sobre la nave: el escudo lo absorbe, si no el jugador pierde una vida.
@@ -689,6 +741,9 @@ function update(dt) {
   if (enemy) {
     const shot = enemy.update(dt, ship);
     if (shot) bullets.push(shot);
+  } else if (enemiesPending > 0) {
+    enemyRespawnTimer -= dt;
+    if (enemyRespawnTimer <= 0) spawnNextEnemy();
   }
 
   bullets.forEach(b => b.update(dt));
@@ -793,18 +848,20 @@ function update(dt) {
     }
   }
 
-  // Nivel completado: en el nivel del enemigo hay que derribarlo también.
+  // Nivel completado: hay que derribar toda la oleada enemiga, incluidas las naves
+  // que todavía no han entrado en pantalla.
   // El chequeo de estado evita avanzar de nivel en el mismo frame en el que
   // la nave acaba de morir (killShip() ya cambió el estado a 'dead'/'gameover').
-  if (state === 'playing' && asteroids.length === 0 && !enemy) nextLevel();
+  if (state === 'playing' && asteroids.length === 0 && !enemy && enemiesPending === 0)
+    nextLevel();
 }
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
-function drawLifeIcon(x, y) {
+function drawLifeIcon(x, y, color = '#fff') {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
-  ctx.strokeStyle = '#fff';
+  ctx.strokeStyle = color;
   ctx.lineWidth   = 1.2;
   ctx.lineJoin    = 'round';
   ctx.beginPath();
@@ -830,7 +887,19 @@ function drawHUD() {
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
 
+  drawEnemyCounter();
   drawPowerUpTimers();
+}
+
+// Naves enemigas que faltan por derribar en el nivel, bajo el contador de vidas.
+// Sin esto, con una segunda nave aún sin entrar el jugador se queda dando vueltas
+// en un campo vacío sin saber por qué no avanza el nivel.
+function drawEnemyCounter() {
+  const remaining = (enemy ? 1 : 0) + enemiesPending;
+  if (remaining === 0) return;
+
+  for (let i = 0; i < remaining; i++)
+    drawLifeIcon(W - 16 - i * 22, 44, '#ff5a5a');
 }
 
 // Cronómetro de power-ups activos (esquina inferior izquierda)
@@ -947,7 +1016,7 @@ function skipLevel() {
   if (state !== 'playing') return;
   if (paused) setPaused(false);
   asteroids = [];
-  enemy     = null;
+  resetEnemyWave(0);   // nextLevel() vuelve a armar la oleada del nivel siguiente
   nextLevel();
 }
 

@@ -208,19 +208,54 @@ in `index.html`.
 
 ## Enemy Ship
 
-An `EnemyShip` spawns **only on level 5** (`ENEMY_LEVEL`), one per level.
+An `EnemyShip` appears on **every level from 5 onwards** (`ENEMY_FIRST_LEVEL`). Both its
+count and its difficulty scale with the level, so level 5 is an introduction rather than a
+spike.
 
 - Same silhouette as the player, drawn through the shared `shipSilhouettePath()` helper,
   stroked in red (`#ff5a5a`). No thruster flame.
-- Turns toward the player at `ENEMY_ROT` (1.8 rad/s) using `angleDiff()` (shortest arc) and
-  `wrappedDelta()` (shortest distance across the toroidal field), thrusts only when roughly
-  aimed, and fires every `ENEMY_FIRE_INTERVAL` (1.4 s).
-- `Bullet` now takes an `owner` (`'player'` by default, or `'enemy'`), which drives its
-  color and speed. Enemy bullets do **not** break asteroids.
-- Worth `ENEMY_POINTS` (300). Collisions: player bullet destroys it; its bullets and a
-  direct ram hit the ship through `shipTakesHit()` (shield absorbs, otherwise `killShip()`).
-- Level completion is `asteroids.length === 0 && !enemy` — the enemy must be downed too.
-- `killShip()` leaves the enemy alive; `nextLevel()` replaces it.
+- Turns toward the player using `angleDiff()` (shortest arc) and `wrappedDelta()` (shortest
+  distance across the toroidal field), and thrusts only when roughly aimed.
+- `Bullet` takes an `owner` (`'player'` by default, or `'enemy'`) driving color and speed,
+  plus an optional `speed` override the enemy uses to scale its shots. Enemy bullets do
+  **not** break asteroids.
+- Worth `ENEMY_POINTS` (300, flat at every level). Collisions: a player bullet destroys it;
+  its bullets and a direct ram hit the ship through `shipTakesHit()` (shield absorbs,
+  otherwise `killShip()`).
+
+### Difficulty scaling
+
+`enemyDifficulty(level)` returns 0 at `ENEMY_FIRST_LEVEL` (5) and reaches 1 at
+`ENEMY_PEAK_LEVEL` (20), staying there afterwards. Each parameter is a `[level 5, level 20]`
+range interpolated by that value:
+
+| Constant | Level 5 | Level 20+ | Previous fixed value |
+|---|---|---|---|
+| `ENEMY_ROT_RANGE` | 1.15 rad/s | 2.20 rad/s | 1.8 |
+| `ENEMY_THRUST_RANGE` | 85 px/s² | 165 px/s² | 120 |
+| `ENEMY_FIRE_RANGE` | 2.40 s | 1.00 s | 1.4 |
+| `ENEMY_BULLET_RANGE` | 300 px/s | 430 px/s | 380 |
+
+Values are **frozen per instance** in the constructor, so a ship never changes behavior
+mid-fight. The first shot is delayed to `fireInterval * 1.5`, giving the player room to
+react to its entrance.
+
+### Waves
+
+`enemiesForLevel(level)` returns 0 below level 5, 1 up to level 19, and `ENEMY_MAX_COUNT`
+(2) from level 20 on. **They are never simultaneous**: `enemy` still holds at most one ship
+and `enemiesPending` counts those still to enter. `killEnemy()` arms `enemyRespawnTimer`
+with `ENEMY_RESPAWN_DELAY` (2 s), and the next ship enters when it elapses.
+
+- The respawn timer only ticks in the `'playing'` branch, so a pending ship never enters
+  while the player is dead and waiting to respawn.
+- Level completion is `asteroids.length === 0 && !enemy && enemiesPending === 0` — a wave
+  member that has not entered yet still blocks the level.
+- `resetEnemyWave(count)` clears all three variables. `initGame()` calls it with 0;
+  `nextLevel()` calls it with `enemiesForLevel(level)` and then spawns the first ship
+  immediately.
+- `drawEnemyCounter()` renders one red ship icon per remaining wave member below the lives
+  row. Without it, a player on an empty field has no way to know a second ship is pending.
 
 ## Notes for Future Work
 
