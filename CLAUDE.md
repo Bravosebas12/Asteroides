@@ -123,6 +123,44 @@ A special "boss" asteroid variant appears randomly (50% chance per level, starti
 
 The boss asteroid health reduces with each bullet hit and is tracked visually (image opacity decreases). When destroyed, it triggers an enhanced explosion effect (30 particles vs 8–20 for regular asteroids).
 
+## Power-Ups
+
+Five power-ups are defined in the `POWERUP_TYPES` catalog in `game.js`. They only appear
+as drops when an asteroid is destroyed — there is no free spawn.
+
+| Power-up | Key | Duration | Effect |
+|---|---|---|---|
+| Escudo Temporal | `SHIELD` | 5 s | Absorbs one asteroid impact, then is consumed (ship gets 1 s of invincibility, the asteroid is pulverized without awarding points) |
+| Disparo Triple | `TRIPLE` | 10 s | `Ship.tryShoot(true)` fires 3 bullets in a `[-0.17, 0, +0.17]` rad fan |
+| Slow Motion | `SLOW` | 6 s | Asteroids update with `dt * 0.5`; ship, bullets and particles keep normal speed |
+| Bomba Nova | `NOVA` | instant | Destroys every asteroid on screen (no splits), awards their points, triggers a 0.25 s white flash |
+| Hiperpropulsión | `HYPER` | 8 s | Thrust 260 → 560 px/s², drag 0.987 → 0.994 (higher terminal speed), longer exhaust flame |
+
+### Drop rules
+- Regular asteroid destroyed → `POWERUP_CHANCE` (18%) to drop.
+- Boss asteroid destroyed → guaranteed drop.
+- At most `POWERUP_MAX` (2) pickups on screen at once.
+- **`TRIPLE` can only appear once per game**: after it is collected, `tripleShotUsed`
+  removes it from the drop pool until `initGame()` runs again.
+- A pickup lives `POWERUP_TTL` (9 s), drifts slowly with wrapping, and blinks in its
+  final 3 seconds.
+
+### Lifecycle
+- `initGame()` resets `powerups`, `effects`, `tripleShotUsed` and `novaFlash`.
+- `nextLevel()` clears on-screen pickups but **keeps active effects running**.
+- `killShip()` clears both pickups and active effects.
+- Collecting an already-active power-up refreshes its full duration.
+
+### Rendering
+- Pickups are wireframe regular polygons (`polygonPath`) tinted per type with the
+  type initial in the center: hexagon (shield), triangle (triple), diamond (slow),
+  octagon (nova), pentagon (hyper).
+- `drawShieldAura()` draws a pulsing cyan ring around the ship while the shield holds.
+- `drawPowerUpTimers()` renders the HUD clock in the bottom-left corner: one row per
+  active effect with its polygon icon, a depleting arc clock, and the remaining seconds
+  with one decimal (`ESCUDO  3.4s`). Rows blink under 1.5 s. A dim `TRIPLE USADO` label
+  appears in the bottom-right once the triple shot has been consumed.
+
 ## Notes for Future Work
 
 - The canvas size is hardcoded as 800×600 (`W` and `H` constants) — both the canvas HTML element and the physics use these values.
